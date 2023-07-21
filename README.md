@@ -28,10 +28,6 @@ Our solution provides an efficient solution for games to draw 2D UI at device re
 
 The technique has visual quality on par with other spatial upscaling techniques while being highly optimized for Adreno™ GPU hardware
 
-*Visual comparison with Bilinear*
-
-<img src="media/snapdragon_gsr_video.gif" width="500" height="500" />
-
 # Integration
 
 Our shader provide a set of configurations that can be adjusted to fine tune your needs, these are briefly explained below and can be found directly on the shader file.
@@ -83,6 +79,11 @@ Besides the provided configurations, the frame time also depends on the input te
 ## Details visual comparison
 
 With Snapdragon GSR, **1080p** games can become sharper **4K** games. Games that were only **30 FPS** can be played at **60+ FPS** so graphics look even smoother. And since performance is correlated with power, you can get these features while **extending battery life** and gameplay time.
+
+*Visual comparison with Bilinear*
+
+<img src="media/snapdragon_gsr_video.gif" width="500" height="500" />
+
 
 ### Artifact (Ray-Tracing enabled)
 
