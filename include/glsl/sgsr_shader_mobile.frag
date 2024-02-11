@@ -40,11 +40,21 @@ layout (set=0, binding = 0) uniform UniformBlock
 };
 layout(set = 0, binding = 1) uniform mediump sampler2D ps0;
 #else
-uniform highp vec4 ViewportInfo[1];
-uniform mediump sampler2D ps0;
-#endif
 
+// ViewportInfo should be a vec4 containing {1.0/low_res_tex_width, 1.0/low_res_tex_height, low_res_tex_width, low_res_tex_height}.
+// The `xy` components will be used to shift UVs to read adjacent texels.
+// The `zw` components will be used to map from UV space [0,1][0,1] to image space [0, w][0, h].
+uniform highp vec4 ViewportInfo[1];
+
+// ps0 is the sampler for the low resolution texture to upscale.
+uniform mediump sampler2D ps0;
+
+#endif  // if defined(UseUniformBlock)
+
+// in_TEXCOORD0 is the texture coord for the current fragment; passed by the vertex shader.
 layout(location=0) in highp vec4 in_TEXCOORD0;
+
+// out_Target0 is the final fragment color.
 layout(location=0) out vec4 out_Target0;
 
 float fastLanczos2(float x)
@@ -54,6 +64,7 @@ float fastLanczos2(float x)
 	wA *= wA;
 	return wB*wA;
 }
+
 vec2 weightY(float dx, float dy,float c, float std)
 {
 	float x = ((dx*dx)+(dy* dy))* 0.55 + clamp(abs(c)*std, 0.0, 1.0);
@@ -63,10 +74,11 @@ vec2 weightY(float dx, float dy,float c, float std)
 
 void main()
 {
-	int mode = OperationMode;
+	const int mode = OperationMode;
 	float edgeThreshold = EdgeThreshold;
 	float edgeSharpness = EdgeSharpness;
 
+	// Sample the low res texture using current texture coordinates (in UV space).
 	vec4 color;
 	if(mode == 1)
 		color.xyz = textureLod(ps0,in_TEXCOORD0.xy,0.0).xyz;
@@ -82,18 +94,25 @@ void main()
 	//if ( mode!=4 && xCenter*xCenter+yCenter*yCenter<=0.4 * 0.4)
 	if ( mode!=4)
 	{
+		// Compute the coordinate for the center of the texel in image space.
 		highp vec2 imgCoord = ((in_TEXCOORD0.xy*ViewportInfo[0].zw)+vec2(-0.5,0.5));
 		highp vec2 imgCoordPixel = floor(imgCoord);
+		// Remap the coordinate for the center of the texel in image space to UV space.
 		highp vec2 coord = (imgCoordPixel*ViewportInfo[0].xy);
 		vec2 pl = (imgCoord+(-imgCoordPixel));
+		// Gather the `[mode]` components (ex: `.y` if mode is 1) of the 4 texels located around `coord`.
 		vec4  left = textureGather(ps0,coord, mode);
 
 		float edgeVote = abs(left.z - left.y) + abs(color[mode] - left.y)  + abs(color[mode] - left.z) ;
 		if(edgeVote > edgeThreshold)
 		{
+			// Shift coord to the right by 1 texel. `coord` will be pointing to the same texel originally sampled
+			// l.84 or 86 (The texel at UV in_TEXCOORD0 in the low res texture).
 			coord.x += ViewportInfo[0].x;
 
+			// Gather components for the texels located to the right of coord (the original sampled texel).
 			vec4 right = textureGather(ps0,coord + highp vec2(ViewportInfo[0].x, 0.0), mode);
+			// Gather components for the texels located to up and down of coord (the original sampled texel).
 			vec4 upDown;
 			upDown.xy = textureGather(ps0,coord + highp vec2(0.0, -ViewportInfo[0].y),mode).wz;
 			upDown.zw  = textureGather(ps0,coord+ highp vec2(0.0, ViewportInfo[0].y), mode).yx;
