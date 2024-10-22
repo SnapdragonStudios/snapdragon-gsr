@@ -1,0 +1,132 @@
+#version 320 es
+
+//============================================================================================================
+//
+//
+//                  Copyright (c) 2024, Qualcomm Innovation Center, Inc. All rights reserved.
+//                              SPDX-License-Identifier: BSD-3-Clause
+//
+//============================================================================================================
+
+#define EPSILON 1.19e-07f
+float DecodeColorY(uint sample32)
+{
+	uint x11 = sample32 >> 21u;
+	return float(x11) * (1.0 / 2047.5);
+}
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+layout(binding = 4) uniform highp usampler2D PrevLumaHistory;
+layout(binding = 5) uniform mediump sampler2D MotionDepthAlphaBuffer;
+layout(binding = 6) uniform highp usampler2D YCoCgColor;
+layout(binding = 0, rgba16f) uniform writeonly mediump image2D MotionDepthClipAlphaBuffer;
+layout(binding = 1, r32ui) uniform writeonly highp uimage2D LumaHistory;
+layout(binding = 0) uniform readonly Params
+{
+    uvec2                renderSize;
+    uvec2                displaySize;
+    vec2                 InViewportSizeInverse;
+    vec2                 displaySizeRcp;
+    vec2                 jitterOffset;
+    vec4                 clipToPrevClip[4];
+    float                preExposure;
+    float                cameraFovAngleHor;
+    float                cameraNear;
+    float                MinLerpContribution;
+    uint                 bSameCamera;
+    uint                 reset;
+} params;
+
+
+void main()
+{
+    ivec2 sampleOffset[4] = ivec2[4](
+        ivec2(-1, -1),
+        ivec2(-1, +0),
+        ivec2(+0, -1),
+        ivec2(+0, +0)
+        );
+
+    uvec4 InputInfo_ViewportMin = uvec4(0, 0, 0, 0);   ////TODO
+    uvec2 InputPos = InputInfo_ViewportMin.xy + gl_GlobalInvocationID.xy;
+
+    vec2 ViewportUV = (vec2(gl_GlobalInvocationID.xy) + vec2(0.5)) * params.InViewportSizeInverse;
+    vec2 gatherCoord = ViewportUV + 0.5f * params.InViewportSizeInverse;
+    uint luma_reference32 = textureGather(YCoCgColor, gatherCoord).w;
+    float luma_reference = DecodeColorY(luma_reference32);
+
+	vec4 mda = texelFetch(MotionDepthAlphaBuffer, ivec2(gl_GlobalInvocationID.xy), 0).xyzw; //motion depth alpha
+	float depth = mda.z;
+	float alphamask = mda.w;
+	vec2 motion = mda.xy;
+
+ #ifdef REQUEST_NDC_Y_UP
+    vec2 PrevUV = vec2(-0.5f * motion.x + ViewportUV.x, 0.5f * motion.y + ViewportUV.y);
+ #else
+    vec2 PrevUV = vec2(-0.5f * motion.x + ViewportUV.x, -0.5f * motion.y + ViewportUV.y);
+ #endif
+    float depthclip = 0.0;
+
+    if (depth < 1.0 - 1.0e-05f) {
+        vec2 Prevf_sample = PrevUV * vec2(params.renderSize) - 0.5f;
+        vec2 Prevfrac = Prevf_sample - floor(Prevf_sample);
+        float OneMinusPrevfacx = 1.0 - Prevfrac.x;
+
+        float Bilinweights[4] = float[4](
+            OneMinusPrevfacx - OneMinusPrevfacx * Prevfrac.y,
+            Prevfrac.x - Prevfrac.x * Prevfrac.y,
+            OneMinusPrevfacx * Prevfrac.y,
+            Prevfrac.x * Prevfrac.y
+            );
+
+        float diagonal_length = length(vec2(params.renderSize));
+        float Wdepth = 0.0;
+        float Wsum = 0.0;
+        float Ksep = 1.37e-05f;
+        float Kfov = params.cameraFovAngleHor;
+        float Ksep_Kfov_diagonal = Ksep * Kfov * diagonal_length;
+        for (int index = 0; index < 4; index+=2){
+            vec4 gPrevdepth = textureGatherOffset(MotionDepthAlphaBuffer, PrevUV, sampleOffset[index], 2);
+            float tdepth1 = min(gPrevdepth.x, gPrevdepth.y);
+            float tdepth2 = min(gPrevdepth.z, gPrevdepth.w);
+            float fPrevdepth = min(tdepth1, tdepth2);
+
+            float Depthsep = Ksep_Kfov_diagonal * (1.0 - min(fPrevdepth, depth));
+            float weight = Bilinweights[index];
+            Wdepth += clamp(Depthsep / (abs(fPrevdepth - depth) + EPSILON), 0.0, 1.0) * weight;
+
+            vec2 gPrevdepth2 = textureGatherOffset(MotionDepthAlphaBuffer, PrevUV, sampleOffset[index + int(1)], 2).zw;
+            fPrevdepth = min(min(gPrevdepth2.x, gPrevdepth2.y), tdepth2);
+            Depthsep = Ksep_Kfov_diagonal * (1.0 - min(fPrevdepth, depth));
+            weight = Bilinweights[index + int(1)];
+            Wdepth += clamp(Depthsep / (abs(fPrevdepth - depth) + EPSILON), 0.0, 1.0) * weight;
+        }
+        depthclip = clamp(1.0f - Wdepth, 0.0, 1.0);
+    }
+
+    vec2 current_luma_diff;
+    uint prev_luma_diff_pack = textureGather(PrevLumaHistory, PrevUV, 0).w;
+    vec2 prev_luma_diff;
+    prev_luma_diff.x = unpackHalf2x16(prev_luma_diff_pack >> 16u).x;
+    prev_luma_diff.y = unpackHalf2x16((prev_luma_diff_pack & uint(0xFFFF))).x;
+
+    bool enable = false;
+    if (depthclip + float(params.reset) < 0.1)
+    {
+        enable = (all(greaterThanEqual(PrevUV, vec2(0.0))) && all(lessThanEqual(PrevUV, vec2(1.0))));
+    }
+    float luma_diff = luma_reference - prev_luma_diff.x;
+    if (!enable)
+    {
+        current_luma_diff.x = 0.0;
+        current_luma_diff.y = 0.0;
+    }else{
+        current_luma_diff.x = luma_reference;
+        current_luma_diff.y = (prev_luma_diff.y != 0.0f) ? ((sign(luma_diff) == sign(prev_luma_diff.y)) ? (sign(luma_diff) * min(abs(prev_luma_diff.y), abs(luma_diff))) : prev_luma_diff.y) : luma_diff;
+    }
+
+    alphamask = floor(alphamask) + 0.5f * float((current_luma_diff.x != 0.0f) && (abs(current_luma_diff.y) != abs(luma_diff)));
+    uint pack = (packHalf2x16(vec2(current_luma_diff.x, 0.0)) << 16u) | packHalf2x16(vec2(current_luma_diff.y, 0.0));
+    imageStore(LumaHistory, ivec2(gl_GlobalInvocationID.xy), uvec4(pack));
+    imageStore(MotionDepthClipAlphaBuffer, ivec2(gl_GlobalInvocationID.xy), vec4(motion, depthclip, alphamask));
+}

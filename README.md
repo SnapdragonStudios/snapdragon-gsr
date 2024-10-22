@@ -2,137 +2,58 @@
 
 ### Table of contents
 - [Snapdragon™ Game Super Resolution](#snapdragon-game-super-resolution)
-    - [Table of contents](#table-of-contents)
+- [Table of contents](#table-of-contents)
 - [Introduction](#introduction)
-- [Integration](#integration)
-    - [Operation mode](#operation-mode)
-    - [Edge threshold](#edge-threshold)
-    - [Edge sharpness](#edge-sharpness)
-    - [Vulkan](#vulkan)
-- [Performance](#performance)
-  - [Runtime cost on Snapdragon](#runtime-cost-on-snapdragon)
-  - [Details visual comparison](#details-visual-comparison)
-    - [Artifact (Ray-Tracing enabled)](#artifact-ray-tracing-enabled)
-    - [Discovery](#discovery)
-- [Other Applications](#other-applications)
 - [Version history](#version-history)
 - [References](#references)
 - [License](#license)
 
 # Introduction
-Snapdragon™ Game Studios developed **Snapdragon™ Game Super Resolution** (**Snapdragon™ GSR** or **SGSR**), which integrates upscaling and sharpening in one single GPU shader pass. The algorithm uses a 12-tap Lanczos-like scaling filter and adaptive sharpening filter, which presents smooth images and sharp edges.
+The **Snapdragon™ Game Super Resolution** (**Snapdragon™ GSR** or **SGSR**) is a group of upscalers tailored to the Adreno™ GPU. **SGSR** provides the best performance on Snapdragon™'s tiled architecture, maximizing visual quality while minimizing memory, processor and battery usage.
 
-![alt text](media/sgsr_filter.png "")
+| [Snapdragon Game Super Resolution 1](https://github.com/SnapdragonStudios/snapdragon-gsr/sgsr/v1) | 
+|------|
 
-Our solution provides an efficient solution for games to draw 2D UI at device resolution for better visual quality, while rendering the 3D scene at a lower resolution for performance and power savings. 
+<img src="sgsr/v1/media/discovery_sgsr.png" width="720px" >
+<br>
 
-The technique has visual quality on par with other spatial upscaling techniques while being highly optimized for Adreno™ GPU hardware
+Snapdragon™ Game Studios developed Snapdragon™ Game Super Resolution 1 (Snapdragon™ GSR 1 or SGSR1), which integrates upscaling and sharpening in one single GPU shader pass. The algorithm uses a 12-tap Lanczos-like scaling filter and adaptive sharpening filter, which presents smooth images and sharp edges.
 
-# Integration
+![alt text](sgsr/v1/media/sgsr_filter.png "")
 
-Our shader provide a set of configurations that can be adjusted to fine tune your needs, these are briefly explained below and can be found directly on the shader file.
+SGSR1 typically offers performance and power savings by allowing a game to render 3D scenes at a lower resolution (with few or no noticeable artifacts introduced by SGSR1's filtered upscaling), while requiring only a single input texture.  
 
-The shader requires an input texture (your low-res 3D scene) and viewport rect, it doesn't require an anti-aliased input but works best with one.
+2D UI should generally be rendered and overlaid at device resolution, since upscaling artifacts tend to be more noticeable with a 2D UI pass, and performance and power savings more negligible.
 
-### Operation mode
+| [Snapdragon Game Super Resolution 2](https://github.com/SnapdragonStudios/snapdragon-gsr/sgsr/v2) | 
+|------|
 
-SGSR comes with 3 operation modes: **RGBA**, **RGBY** and **LERP**, by default the shader is set to use **RGBA** (mode 1).
+<img src="sgsr/v2/media/hero_image.png" width="720px" >
+<br>
 
-### Edge threshold
+**Snapdragon™ Game Super Resolution 2** (**Snapdragon™ GSR 2** or just **SGSR 2**) was developed by Qualcomm Snapdragon™ Game Studios; it's our temporal upscaling solution optimized for Adreno GPUs.
 
-We suggest keeping its value as *8.0/255* for mobile applications but changing it to *4.0/255* if targeting VR.
+Snapdragon™ GSR 2 strikes a better balance between performance and visual quality on mobile devices than other temporal upscaling methods. Its main goal is to improve the quality of the final image by reducing aliasing, flicker, and ghosting while increasing image resolution.
 
-### Edge sharpness
+By comparison, TAAU is a simple and fast upscaling version of TAA. It tends to do a good job of reducing aliasing in moving images but also amplifies TAA's shortcomings, such as ghosting. Other alternatives have been developed to produce better perceptual visual quality than TAAU, but these are notoriously slow on mobile GPUs, often introducing compute shader bottlenecks and consuming a lot of power.
 
-By default this value is set to *2*, but any number in the range *[1.0, 2.0]* can be used.
-
-### Vulkan
-
-If targeting vulkan, uncomment the *UseUniformBlock* define.
-
-# Performance
-
-## Runtime cost on Snapdragon
-
-SGSR is well optimized to run on Adreno™ and generally can provide maximum wave occupancy. Considering input content with a resolution of **1240x576**, the following frame times were measured using our most recent Snapdragon™ chips:
-
-**SGSR**
-| Edge Threshold | SD888    | SD8Gen1  | SD8Gen2  |
-| ---------------|----------|----------|----------|
-| **4**          | 0.4756ms | 0.3563ms | 0.2952ms |
-| **8**          | 0.4754ms | 0.3543ms | 0.2939ms |
-
-**BILINEAR/LERP**
-|  SD888    | SD8Gen1  | SD8Gen2  |
-| ----------|----------|----------|
-|  0.2476ms | 0.1963ms | 0.1558ms |
-
-Device configurations at maximum GPU frequency:
-* Snapdragon 888 (**2340x1080**)
-* Snapdragon 8 Gen1 (**2340x1080**)
-* Snapdragon 8 Gen2 (**2400x1600**)
-
-SGSR performance scales lineally with the configured scaling ouput region (configurable on the shader). RGBA shares the exact same speed with RGBY. 
-
-Besides the provided configurations, the frame time also depends on the input texture resolution and final output resolution.
-
-## Details visual comparison
-
-With Snapdragon GSR, **1080p** games can become sharper **4K** games. Games that were only **30 FPS** can be played at **60+ FPS** so graphics look even smoother. And since performance is correlated with power, you can get these features while **extending battery life** and gameplay time.
-
-*Visual comparison with Bilinear*
-
-<img src="media/snapdragon_gsr_video.gif" width="500" height="500" />
-
-
-### Artifact (Ray-Tracing enabled)
-
-Performance and visual comparison of rendering at Native (1080p) resolution vs. using Snapdragon GSR upscaling. This demonstration was created in Unreal Engine 5 with Ray Query shadows at 2 rays per pixel.
-
-*21.7FPS*
-![alt text](media/artifact_original_21.7FPS.png "Artifact original, providing 21.7FPS.")
-
-*50% screen res upscaled - 60FPS*
-![alt text](media/artifact_sgsr_half_60FPS.png "Artifact at 50% resolution with SGSR, providing 60FPS.")
-
-### Discovery
-
-Visual comparison of rendering at Native (4K) vs. Bilinear vs. Snapdragon GSR.
-
-*Original*
-![alt text](media/discovery_original_2160p.png "2160p original.")
-
-*Bilinear (lerp)*
-![alt text](media/discovery_lerp.png "1080p upscaled with nearest neighbor.")
-
-*SGSR*
-![alt text](media/discovery_sgsr.png "1080p upscaled with SGSR.")
-
-*Closeup*
-![alt text](media/discovery_mosaic.png "4K captures from our Discovery application.")
-
-# Other Applications
-
-The high performance, low latency, single-pass nature of SGSR makes it well suited for XR applications. Unlike other popular super resolution algorithms, SGSR uses only a single GPU pass, so it can be combined with other operations minimizing latency and additional bandwidth.
-
-Although not provided here, our shader can be mixed with AA techniques, potentially saving a lot of application bandwidth.
+Snapdragon™ GSR 2 is an improvement on all fronts, ensuring applications retain their visual fidelity while being easy on power consumption.
 
 # Version history
 
 | Version        | Date              |
 | ---------------|-------------------|
 | **1.0.0**      | 2023-06-29        |
+| **1.1.0**      | 2024-01-29        |
+| **2.0.0**      | 2024-11-21        |
 
 # References
 
-**Introducing Snapdragon Game Super Resolution**, 
+**Introducing Snapdragon™ Game Super Resolution**, 
 [https://www.qualcomm.com/news/onq/2023/04/introducing-snapdragon-game-super-resolution](https://www.qualcomm.com/news/onq/2023/04/introducing-snapdragon-game-super-resolution)
 
 **Using Super Resolution to Boost Resolution in Virtual Reality**, 
 [https://developer.qualcomm.com/blog/using-super-resolution-boost-resolution-virtual-reality](https://developer.qualcomm.com/blog/using-super-resolution-boost-resolution-virtual-reality)
-
-
-
 
 # License
 Snapdragon™ Game Super Resolution is licensed under the BSD 3-clause “New” or “Revised” License. Check out the [LICENSE](LICENSE) for more details.
