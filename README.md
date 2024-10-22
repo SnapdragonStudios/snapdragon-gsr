@@ -11,7 +11,7 @@
 # Introduction
 The **Snapdragon™ Game Super Resolution** (**Snapdragon™ GSR** or **SGSR**) is a group of upscalers tailored to the Adreno™ GPU. **SGSR** provides the best performance on Snapdragon™'s tiled architecture, maximizing visual quality while minimizing memory, processor and battery usage.
 
-| [Snapdragon Game Super Resolution 1](https://github.com/SnapdragonStudios/snapdragon-gsr/sgsr/v1) | 
+| [Snapdragon Game Super Resolution 1](https://github.com/SnapdragonStudios/snapdragon-gsr/tree/main/sgsr/v1) | 
 |------|
 
 <img src="sgsr/v1/media/discovery_sgsr.png" width="720px" >
@@ -25,7 +25,7 @@ SGSR1 typically offers performance and power savings by allowing a game to rende
 
 2D UI should generally be rendered and overlaid at device resolution, since upscaling artifacts tend to be more noticeable with a 2D UI pass, and performance and power savings more negligible.
 
-| [Snapdragon Game Super Resolution 2](https://github.com/SnapdragonStudios/snapdragon-gsr/sgsr/v2) | 
+| [Snapdragon Game Super Resolution 2](https://github.com/SnapdragonStudios/snapdragon-gsr/tree/main/sgsr/v2) | 
 |------|
 
 <img src="sgsr/v2/media/hero_image.png" width="720px" >
