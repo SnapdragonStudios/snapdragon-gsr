@@ -46,8 +46,7 @@ vec2     renderSize;             /**< Render size                               
 vec2     displaySize;            /**< Display size                                                                            	*/
 vec2     renderSizeRcp;          /**< 1.0 / renderSize                                                                        	*/
 vec2     displaySizeRcp;         /**< 1.0 / displaySize                                                                       	*/
-vec2     jitterOffset;           /**< Ranges from [-0.5, 0.5], calculated using the Halton sequence 
-                                      (scale it down with the size of view and offset projection matrix)                      	*/
+vec2     jitterOffset;           /**< Ranges from [-0.5, 0.5], calculated using the Halton sequence                       	*/
 vec4     clipToPrevClip[4];      /**< Convert current clip space position to previous clip scape position*                    	*/
 float    preExposure;            /**< Exposure for tone mapping**                                                             	*/
 float    cameraFovAngleHor;      /**< Horizontal camera FOV***                                                                  	*/
@@ -60,21 +59,34 @@ uint     reset;                  /**< If accumulation should be reset -- eg last
 
 **\*** Normally defined by `<previous_view_proj> * <inv_current_view_proj>`:
 ```glsl
-glm::mat4 inv_view = glm::inverse(current_view);
-glm::mat4 inv_proj = glm::inverse(current_proj);
-glm::mat4 inv_vp   = inv_view * inv_proj;
-glm::mat4 mt       = (previous_view_proj * inv_vp);
+glm::mat4 inv_view       = glm::inverse(current_view);
+glm::mat4 inv_proj       = glm::inverse(current_proj);
+glm::mat4 inv_vp         = inv_view * inv_proj;
+glm::mat4 clipToPrevClip = (previous_view_proj * inv_vp);
 ```
 **\*\*** Calculated as `<previous_pre_exposure> / <current_pre_exposure\>` where *pre_exposure* is the exposure of the scene before tone mapping.<br>
 **\*\*\*** Calculated as `tan(<camera_vertical_fov> / 2.0 ) * <render_width> / <render_height>` or `tan(<camera_horizontal_fov> / 2.0 )` (radians).<br>
 **\*\*\*\*** Calculated as:
 ```c++
 uint32_t bSameCamera  = 0;
-float    cameraFactor = abs(mt[0][0] - 1.0) + abs(mt[1][1] - 1.0) + abs(mt[2][2] - 1.0) + abs(mt[3][3] - 1.0)
-                      + abs(mt[1][0]) + abs(mt[1][2]) + abs(mt[1][3])
-                      + abs(mt[2][0]) + abs(mt[2][1]) + abs(mt[2][3])
-                      + abs(mt[3][0]) + abs(mt[3][1]) + abs(mt[3][2]);
-if (cameraFactor < 1e-5) bSameCamera = 1;
+auto IsCameraStill = [](const glm::mat4& curVP, const glm::mat4& prevVP, float threshold=1e-5)
+{
+    float vpDiff = 0;
+    for(int i = 0; i < 4; i++)
+    {
+        for(int j = 0; j < 4; j++)
+        {
+            vpDiff += abs(curVP[i][j] - prevVP[i][j]);
+        }
+    }
+    if (vpDiff < threshold) 
+    {
+        return true;
+    }
+    return false;
+};
+const bool is_camera_still = IsCameraStill(curr_view_proj_matrix, prev_view_proj_matrix, 1e-5);
+bSameCamera = is_camera_still ? 1 : 0;
 ```
 
 ### Pass NDC Considerations
