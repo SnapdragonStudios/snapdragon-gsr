@@ -45,7 +45,7 @@ Snapdragon™ GSR 2 is an improvement on all fronts, ensuring applications retai
 | ---------------|-------------------|
 | **1.0.0**      | 2023-06-29        |
 | **1.1.0**      | 2024-01-29        |
-| **2.0.0**      | 2024-11-21        |
+| **2.0.0**      | 2024-10-21        |
 
 # References
 
