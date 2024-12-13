@@ -30,25 +30,27 @@ vec3 DecodeColor(uint sample32)
 }
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
-layout(binding = 7) uniform highp sampler2D PrevHistoryOutput;
-layout(binding = 8) uniform highp sampler2D MotionDepthClipAlphaBuffer;
-layout(binding = 9) uniform highp usampler2D YCoCgColor;
-layout(binding = 0, rgba16f) uniform writeonly mediump image2D SceneColorOutput;
-layout(binding = 1, rgba16f) uniform writeonly mediump image2D HistoryOutput;
 
-layout(binding = 0) uniform readonly Params
+layout(set = 0, binding = 1) uniform highp sampler2D PrevHistoryOutput;
+layout(set = 0, binding = 2) uniform highp sampler2D MotionDepthClipAlphaBuffer;
+layout(set = 0, binding = 3) uniform highp usampler2D YCoCgColor;
+layout(set = 0, binding = 4, rgba16f) uniform writeonly mediump image2D HistoryOutput;
+layout(set = 0, binding = 5, rgba16f) uniform writeonly mediump image2D SceneColorOutput;
+
+layout(std140, set = 0, binding = 0) uniform readonly Params
 {
     uvec2                renderSize;
     uvec2                displaySize;
     vec2                 renderSizeRcp;
     vec2                 displaySizeRcp;
     vec2                 jitterOffset;
+    vec2                 padding1;
     vec4                 clipToPrevClip[4];
     float                preExposure;
     float                cameraFovAngleHor;
     float                cameraNear;
     float                MinLerpContribution;
-    uint                 sameCameraFrmNum;
+    uint                 bSameCamera;
     uint                 reset;
 } params;
 

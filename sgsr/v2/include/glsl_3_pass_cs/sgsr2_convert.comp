@@ -18,20 +18,21 @@ vec2 decodeVelocityFromTexture(vec2 ev) {
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
-layout(binding = 0) uniform highp sampler2D InputOpaqueColor;
-layout(binding = 1) uniform highp sampler2D InputColor;
-layout(binding = 2) uniform highp sampler2D InputDepth;
-layout(binding = 3) uniform highp sampler2D InputVelocity;
-layout(binding = 0, rgba16f) uniform writeonly mediump image2D MotionDepthAlphaBuffer;
-layout(binding = 1, r32ui) uniform writeonly highp uimage2D YCoCgColor;
+layout(set = 0, binding = 1) uniform highp sampler2D InputOpaqueColor;
+layout(set = 0, binding = 2) uniform highp sampler2D InputColor;
+layout(set = 0, binding = 3) uniform highp sampler2D InputDepth;
+layout(set = 0, binding = 4) uniform highp sampler2D InputVelocity;
+layout(set = 0, binding = 5, r32ui) uniform writeonly highp uimage2D YCoCgColor;
+layout(set = 0, binding = 6, rgba16f) uniform writeonly mediump image2D MotionDepthAlphaBuffer;
 
-layout(binding = 0) uniform readonly Params
+layout(std140, set = 0, binding = 0) uniform readonly Params
 {
     uvec2                renderSize;
     uvec2                displaySize;
     vec2                 ViewportSizeInverse;
     vec2                 displaySizeRcp;
     vec2                 jitterOffset;
+    vec2                 padding1;
     vec4                 clipToPrevClip[4];
     float                preExposure;
     float                cameraFovAngleHor;
@@ -40,7 +41,6 @@ layout(binding = 0) uniform readonly Params
     uint                 bSameCamera;
     uint                 reset;
 } params;
-
 
 void main()
 {

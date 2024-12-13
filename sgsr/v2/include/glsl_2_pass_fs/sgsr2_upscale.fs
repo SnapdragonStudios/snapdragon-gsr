@@ -11,7 +11,6 @@
 precision mediump float;
 precision highp int;
 
-
 float FastLanczos(float base)
 {
 	float y = base - 1.0f;
@@ -23,23 +22,11 @@ float FastLanczos(float base)
 layout(location = 0) out mediump vec4 Output;
 layout(location = 0) in highp vec2 texCoord;
 
-layout(binding = 1) uniform mediump sampler2D PrevOutput;
-layout(binding = 2) uniform mediump sampler2D MotionDepthClipAlphaBuffer;
-layout(binding = 3) uniform mediump sampler2D InputColor;
+layout(set = 0, binding = 1) uniform mediump sampler2D PrevOutput;
+layout(set = 0, binding = 2) uniform mediump sampler2D MotionDepthClipAlphaBuffer;
+layout(set = 0, binding = 3) uniform mediump sampler2D InputColor;
 
-/*
-UBO description
-    renderSize = {InputResolution.x, InputResolution.y}
-    outputSize = {OutputResolution.x, OutputResolution.y}
-    renderSizeRcp = {1.0 / InputResolution.x, 1.0 / InputResolution.y}
-    outputSizeRcp = {1.0 / OutputResolution.x, 1.0 / OutputResolution.y}
-    jitterOffset = {jitter.x, jitter.y},
-    scaleRatio = {OutputResolution.x / InputResolution.x, min(20.0, pow((OutputResolution.x*OutputResolution.y) / (InputResolution.x*InputResolution.y), 3.0)},
-    angleHor = tan(radians(m_Camera.verticalFOV / 2)) * InputResolution.x / InputResolution.y
-    MinLerpContribution = sameCameraFrmNum? 0.3: 0.0;
-    sameCameraFrmNum  //the frame number where camera pose is exactly same with previous frame
-*/
-layout(binding = 0) uniform readonly Params
+layout(std140, set = 0, binding = 0) uniform readonly Params
 {
     highp vec4                 clipToPrevClip[4];
     highp vec2                 renderSize;
@@ -51,7 +38,7 @@ layout(binding = 0) uniform readonly Params
     highp float                cameraFovAngleHor;
     highp float                minLerpContribution;
     highp float                reset;
-    uint                       sameCameraFrmNum;
+    uint                       bSameCamera;
 } params;
 
 void main()
@@ -65,14 +52,18 @@ void main()
     Jitteruv.x = clamp(Hruv.x + (params.jitterOffset.x * params.outputSizeRcp.x), 0.0, 1.0);
     Jitteruv.y = clamp(Hruv.y + (params.jitterOffset.y * params.outputSizeRcp.y), 0.0, 1.0);
 
-    ivec2 InputPos = ivec2(Jitteruv * params.renderSize);
+    highp ivec2 InputPos = ivec2(Jitteruv * params.renderSize);
 
     highp vec3 mda = textureLod(MotionDepthClipAlphaBuffer, Jitteruv, 0.0).xyz;
     highp vec2 Motion = mda.xy;
 
     highp vec2 PrevUV;
     PrevUV.x = clamp(-0.5 * Motion.x + Hruv.x, 0.0, 1.0);
+#ifdef REQUEST_NDC_Y_UP
+    PrevUV.y = clamp(0.5 * Motion.y + Hruv.y, 0.0, 1.0);
+#else
     PrevUV.y = clamp(-0.5 * Motion.y + Hruv.y, 0.0, 1.0);
+#endif
 
     float depthfactor = mda.z;
 
@@ -90,7 +81,7 @@ void main()
     vec3 rectboxcenter = vec3(0.0);
     vec3 rectboxvar = vec3(0.0);
     float rectboxweight = 0.0;
-    highp vec2 srcpos = highp vec2(InputPos) + highp vec2(0.5) - params.jitterOffset;
+    highp vec2 srcpos = vec2(InputPos) + vec2(0.5) - params.jitterOffset;
 
     kernelbias *= 0.5f;
     float kernelbias2 = kernelbias * kernelbias;
