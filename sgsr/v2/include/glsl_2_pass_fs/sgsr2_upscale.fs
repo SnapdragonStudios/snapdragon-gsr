@@ -49,8 +49,8 @@ void main()
     highp vec2 Hruv = texCoord;
 
     highp vec2 Jitteruv;
-    Jitteruv.x = clamp(Hruv.x + (params.jitterOffset.x * params.outputSizeRcp.x), 0.0, 1.0);
-    Jitteruv.y = clamp(Hruv.y + (params.jitterOffset.y * params.outputSizeRcp.y), 0.0, 1.0);
+    Jitteruv.x = clamp(Hruv.x + (params.jitterOffset.x * params.renderSizeRcp.x), 0.0, 1.0);
+    Jitteruv.y = clamp(Hruv.y + (params.jitterOffset.y * params.renderSizeRcp.y), 0.0, 1.0);
 
     highp ivec2 InputPos = ivec2(Jitteruv * params.renderSize);
 
